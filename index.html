@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CRUD de Insectos</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+</head>
+<body class="bg-light">
+
+<div class="container mt-5">
+    <div class="row">
+        <div class="col-md-4">
+            <div class="card shadow-sm">
+                <div class="card-body">
+                    <h4 class="card-title text-success mb-4" id="formTitle">Nuevo Insecto</h4>
+                    <form id="insectoForm">
+                        <input type="hidden" id="insectoId">
+                        
+                        <div class="mb-3">
+                            <label class="form-label">Nombre Común</label>
+                            <input type="text" id="nombre" class="form-control" placeholder="Ej. Viuda Negra" required>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label class="form-label">Especie</label>
+                            <input type="text" id="especie" class="form-control" placeholder="Ej. Latrodectus" required>
+                        </div>
+                        
+                        <div class="form-check mb-4">
+                            <input class="form-check-input" type="checkbox" id="peligroso">
+                            <label class="form-check-label" for="peligroso">
+                                ¿Es venenoso/peligroso?
+                            </label>
+                        </div>
+                        
+                        <button type="submit" class="btn btn-success w-100" id="btnGuardar">Guardar Insecto</button>
+                        <button type="button" class="btn btn-secondary w-100 mt-2 d-none" id="btnCancelar" onclick="resetForm()">Cancelar Edición</button>
+                    </form>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-8">
+            <div class="card shadow-sm">
+                <div class="card-body">
+                    <h4 class="card-title text-primary mb-4">Registro de Insectos</h4>
+                    <div class="table-responsive">
+                        <table class="table table-hover align-middle">
+                            <thead class="table-dark">
+                                <tr>
+                                    <th>ID</th>
+                                    <th>Nombre</th>
+                                    <th>Especie</th>
+                                    <th>Riesgo</th>
+                                    <th class="text-center">Acciones</th>
+                                </tr>
+                            </thead>
+                            <tbody id="tablaInsectos">
+                                </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    // URL LOCAL DEL BACKEND (Asegúrate de que Spring Boot esté corriendo)
+    const API_URL = 'http://localhost:8080/api/insectos';
+
+    // 1. READ: Obtener y mostrar todos los insectos
+    async function cargarInsectos() {
+        try {
+            const respuesta = await fetch(API_URL);
+            const insectos = await respuesta.json();
+            const tbody = document.getElementById('tablaInsectos');
+            tbody.innerHTML = ''; // Limpiar tabla
+
+            insectos.forEach(insecto => {
+                const badgeRiesgo = insecto.peligroso 
+                    ? '<span class="badge bg-danger">Peligroso</span>' 
+                    : '<span class="badge bg-info text-dark">Inofensivo</span>';
+
+                tbody.innerHTML += `
+                    <tr>
+                        <td>${insecto.id}</td>
+                        <td class="fw-bold">${insecto.nombre}</td>
+                        <td class="fst-italic text-muted">${insecto.especie}</td>
+                        <td>${badgeRiesgo}</td>
+                        <td class="text-center">
+                            <button class="btn btn-sm btn-outline-primary me-1" onclick="prepararEdicion(${insecto.id}, '${insecto.nombre}', '${insecto.especie}', ${insecto.peligroso})">Editar</button>
+                            <button class="btn btn-sm btn-outline-danger" onclick="eliminarInsecto(${insecto.id})">Eliminar</button>
+                        </td>
+                    </tr>
+                `;
+            });
+        } catch (error) {
+            console.error("Error al cargar los insectos (¿Está encendido Spring Boot?):", error);
+        }
+    }
+
+    // 2. CREATE & UPDATE: Guardar formulario
+    document.getElementById('insectoForm').addEventListener('submit', async (e) => {
+        e.preventDefault(); // Evitar que la página recargue
+
+        const id = document.getElementById('insectoId').value;
+        const nombre = document.getElementById('nombre').value;
+        const especie = document.getElementById('especie').value;
+        const peligroso = document.getElementById('peligroso').checked;
+
+        const insectoDTO = { nombre, especie, peligroso }; // Mismo formato que tu DTO de Java
+
+        // Si hay un ID, es un PUT (Actualizar). Si no, es un POST (Crear).
+        const metodo = id ? 'PUT' : 'POST';
+        const urlPeticion = id ? `${API_URL}/${id}` : API_URL;
+
+        await fetch(urlPeticion, {
+            method: metodo,
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(insectoDTO)
+        });
+
+        resetForm();
+        cargarInsectos();
+    });
+
+    // 3. DELETE: Eliminar un insecto
+    async function eliminarInsecto(id) {
+        if (confirm('¿Estás seguro de que deseas eliminar este registro?')) {
+            await fetch(`${API_URL}/${id}`, { method: 'DELETE' });
+            cargarInsectos();
+        }
+    }
+
+    // 4. Llenar el formulario para Editar
+    function prepararEdicion(id, nombre, especie, peligroso) {
+        document.getElementById('insectoId').value = id;
+        document.getElementById('nombre').value = nombre;
+        document.getElementById('especie').value = especie;
+        document.getElementById('peligroso').checked = peligroso;
+        
+        document.getElementById('formTitle').innerText = 'Editar Insecto';
+        document.getElementById('formTitle').className = 'card-title text-primary mb-4';
+        document.getElementById('btnGuardar').innerText = 'Actualizar';
+        document.getElementById('btnGuardar').className = 'btn btn-primary w-100';
+        document.getElementById('btnCancelar').classList.remove('d-none');
+    }
+
+    // Limpiar el formulario
+    function resetForm() {
+        document.getElementById('insectoForm').reset();
+        document.getElementById('insectoId').value = '';
+        document.getElementById('formTitle').innerText = 'Nuevo Insecto';
+        document.getElementById('formTitle').className = 'card-title text-success mb-4';
+        document.getElementById('btnGuardar').innerText = 'Guardar Insecto';
+        document.getElementById('btnGuardar').className = 'btn btn-success w-100';
+        document.getElementById('btnCancelar').classList.add('d-none');
+    }
+
+    // Cargar los datos automáticamente al abrir la página
+    cargarInsectos();
+</script>
+
+</body>
+</html>
